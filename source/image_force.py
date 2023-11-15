@@ -5,9 +5,8 @@ class ImageForce:
         self._image = image
         self._r = None
 
-    def get_force(self, level_set_function):
-        mask = level_set_function >= 0
-        self._r = self.compute_force(mask)
+    def get_force(self, interior_mask):
+        self._r = self.compute_force(interior_mask)
         return self._r
 
 class Force1(ImageForce):

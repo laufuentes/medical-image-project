@@ -1,5 +1,9 @@
+import cv2 as cv
+from matplotlib import pyplot as plt
 import numpy as np
 from tqdm import tqdm
+
+from utils import normalization
 
 
 def l2_diff(f1: np.array, f2: np.array) -> float:
@@ -7,19 +11,24 @@ def l2_diff(f1: np.array, f2: np.array) -> float:
     return l2_diff
 
 
+# FIXME: Add exception when the algorithm do not find a convergence
 class GaussSeidelGCS:
-    def __init__(self, lambda_value: float, mu_value: float) -> None:
-        self._lambda = lambda_value  # for constraints
-        self._mu = mu_value  # for energy
+    def __init__(self, nu_value: float, lambda_value: float, error: float) -> None:
+        self._nu = nu_value
+        self._lambda = lambda_value
+        self._error = error
+
 
     def compute(
             self,
             u: np.array,
             r: np.array,
             b: np.array,
-            d: np.array
+            d: np.array,
             ) -> tuple[np.array, list]:
         u = u.astype(np.float64)
+
+        # Create once the auxiliary vector alpha
         dx = d[:, :, 0]
         dy = d[:, :, 1]
         bx = b[:, :, 0]
@@ -29,10 +38,17 @@ class GaussSeidelGCS:
             for j in range(1, u.shape[1] - 1):
                 alpha[i, j] = dx[i - 1, j] - dx[i, j] - bx[i-1, j] + bx[i, j]
                 + dy[i, j-1] - dy[i, j] - by[i, j-1] + by[i, j]
-        unew, hist = GaussSeidel().compute(
+        b = (self._lambda/self._nu) * r - alpha
+        unew, hist = GaussSeidel(tolerance=self._error).compute(
             p=u,
-            b=(self._mu/self._lambda) * r - alpha,
+            b=b,
             dx=1)
+        # debug
+        plt.plot(hist)
+        plt.savefig('results_error_GS.png')
+        cv.imwrite(f'results/r.tif', r)
+        if np.all(unew == 1) or np.all(unew == 0):
+            raise ValueError("Gauss Seidel GCS returning a level set of ones or zeros")
         return unew, hist
 
 
@@ -42,7 +58,7 @@ class GaussSeidel:
 
     def __init__(
             self,
-            tolerance: float = 1e-10,
+            tolerance: float = 1e-3,
             max_iter: int = 10000
             ) -> None:
         self.tolerance = tolerance
@@ -55,16 +71,13 @@ class GaussSeidel:
         pnew = p.copy()
         nx = p.shape[0]
         ny = p.shape[1]
+        self.p_evolution = [p]
         with tqdm(total=self.max_iter, desc='Gauss Seidel Iteration') as pbar:
             while (diff > self.tolerance):
                 if it > self.max_iter:
-                    print(f'Solution did not converged within the maximum'
-                          f' number of iterations.'
-                          f' Last l2_diff was: {diff:.5e}')
                     break
 
                 np.copyto(p, pnew)
-
                 # We only modify interior nodes. The boundary nodes
                 # remain equal to zero and the Dirichlet boundary
                 # conditions are therefore automatically enforced.
@@ -76,11 +89,50 @@ class GaussSeidel:
 
                 diff = l2_diff(pnew, p)
                 tol_hist_gs.append(diff)
+                self.p_evolution.append(pnew)
                 it += 1
                 pbar.update(1)
-            else:
-                print(f'The solution converged after {it} iterations')
+        if it > self.max_iter:
+            print(f'Solution did not converged within the maximum'
+                  f' number of iterations. Last l2_diff was: {diff:.5e}')
+        else:
+            print(f'The solution converged after {it} iterations')
+        if np.any(np.isnan(pnew)):
+            raise ValueError("Gauss Seidel returning NaN value")
         return pnew, tol_hist_gs
+
+    def plot_per_iteration(self, iterations_list=None):
+        if iterations_list is None:
+            n_iter = len(self.p_evolution)
+            c = 100
+            n_graph = n_iter // c
+            index = 1
+            plt.figure(figsize=(12, 12))
+            for i in range(n_iter):
+                if i % c == 0:
+                    p = self.p_evolution[i]
+                    plt.subplot(n_graph//4, 4, index)
+                    plt.imshow(p)
+                    plt.title('iter = %s' % i)
+                    index += 1
+                if index > (n_graph//4) * 4:
+                    break
+            plt.tight_layout()
+            plt.show()
+        else:
+            plt.figure(figsize=(12, 12))
+            n_graph = len(iterations_list)
+            index = 1
+            for i in iterations_list:
+                p = self.p_evolution[i]
+                plt.subplot(n_graph//4, 4, index)
+                plt.imshow(p)
+                plt.title('iter = %s' % i)
+                index += 1
+                if index > (n_graph//4) * 4:
+                    break
+            plt.tight_layout()
+            plt.show()
 
 
 def create_test_data():
@@ -104,5 +156,7 @@ def create_test_data():
 
 if __name__ == '__main__':
     p0, b, dx, _ = create_test_data()
-    pnew, hist = GaussSeidel().compute(p0, b, dx)
+    gauss_seidel = GaussSeidel(max_iter=1000)
+    pnew, hist = gauss_seidel.compute(p0, b, dx)
+    gauss_seidel.plot_per_iteration([1,2,3,4,5,6,8,8,9])
     print()
