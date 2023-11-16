@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 from tqdm import tqdm
 
-from utils import normalization
+from .utils import normalization
 
 
 def l2_diff(f1: np.array, f2: np.array) -> float:
@@ -13,11 +13,17 @@ def l2_diff(f1: np.array, f2: np.array) -> float:
 
 # FIXME: Add exception when the algorithm do not find a convergence
 class GaussSeidelGCS:
-    def __init__(self, nu_value: float, lambda_value: float, error: float) -> None:
+    def __init__(
+            self,
+            nu_value: float,
+            lambda_value: float,
+            error: float,
+            debug: bool = False,
+            ) -> None:
         self._nu = nu_value
         self._lambda = lambda_value
         self._error = error
-
+        self._debug = debug
 
     def compute(
             self,
@@ -44,9 +50,13 @@ class GaussSeidelGCS:
             b=b,
             dx=1)
         # debug
-        plt.plot(hist)
-        plt.savefig('results_error_GS.png')
-        cv.imwrite(f'results/r.tif', r)
+        if self._debug:
+            plt.title("Gauss Seidel Convergence of every iteration")
+            plt.plot(np.arange(len(hist)), hist)
+            plt.ylim(0, 1)
+            plt.savefig('results/results_error_GS.png')
+
+            cv.imwrite(f'results/r.tif', r)
         if np.all(unew == 1) or np.all(unew == 0):
             raise ValueError("Gauss Seidel GCS returning a level set of ones or zeros")
         return unew, hist
