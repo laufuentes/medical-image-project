@@ -19,7 +19,6 @@ class SplitBregmanGCS():
     def __init__(
             self,
             force: ImageForce,
-            initial_level_set: np.array,
             lambda_value: float,
             nu_value: float,
             epsilon_value: float,
@@ -28,7 +27,6 @@ class SplitBregmanGCS():
             debug: bool = False
             ) -> None:
         self._force = force
-        self._initial_level_set = initial_level_set
         self._lambda = lambda_value   # for our energy function
         self._nu = nu_value  # regularization for constraints
         self._epsilon = epsilon_value  # stop criterion
@@ -46,8 +44,9 @@ class SplitBregmanGCS():
         out[np.isnan(out)] = 0
         return out
 
-    def run(self):
-        u = self._initial_level_set.copy()
+    def run(self, initial_level_set):
+        self._initial_level_set = initial_level_set
+        u = initial_level_set.copy()
         u_prev = np.ones_like(u)
 
         d = np.zeros((u.shape[0], u.shape[1], 2))
@@ -123,13 +122,13 @@ if __name__ == '__main__':
     force2 = Force2(image)
     segmentator = SplitBregmanGCS(
         force1,
-        initial_level_set,
         lambda_value=1,
         nu_value=0.5,
         epsilon_value=0.031,
         gs_error=1e-3,
         debug=True)
-    last_level_set, last_level_set_no_normalized = segmentator.run()
+    last_level_set, last_level_set_no_normalized = segmentator.run(
+        initial_level_set)
     
     plt.figure()
     plt.imshow(image, cmap='gray')
