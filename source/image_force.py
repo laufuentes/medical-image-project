@@ -28,25 +28,29 @@ class Force1(ImageForce):
 
 
 class Force2(ImageForce):
-    def proba_in(self):
-        return (1/np.sqrt(2*np.pi*self._var_value_in))*np.exp(-(self._image - self._mean_value_in)**2/(2*self._var_value_in))
-    
-    def proba_out(self):
-        return (1/np.sqrt(2*np.pi*self._var_value_out))*np.exp(-(self._image - self._mean_value_out)**2/(2*self._var_value_out))
+    def _get_mean_and_std(self, mask):
+        mean = np.mean(self._image[mask])
+        std = np.std(self._image[mask])
+        if std == 0:
+            raise ValueError(f"Invalid std={std}")
+        return mean, std
+
+    def _gaussian_power_and_amplitude(self, mean, sigma):
+        c = 1 / np.sqrt(2 * np.pi * sigma**2)
+        power = -0.5 * (self._image - mean)**2 / sigma ** 2
+        return c, power
+
+    def _probability(self, mask):
+        mean, std = self._get_mean_and_std(mask)
+        c, power = self._gaussian_power_and_amplitude(mean, std)
+        return np.log(c) + power
 
     def compute_force(self, mask):
-        self._mask_in = mask
-        self._mask_out = np.logical_not(mask)
-        self._mean_value_in = np.mean(self._image[self._mask_in])
-        self._var_value_in = np.std(self._image[self._mask_in])**2
-        self._mean_value_out = np.mean(self._image[self._mask_out])
-        self._var_value_out = np.std(self._image[self._mask_out])**2
-        r = np.log(self.proba_in()) - np.log(self.proba_out())
-        mask_invalid_values = np.logical_or(np.isnan(r), np.isinf(r))
-        if np.all(mask_invalid_values):
-            print('All values are inf or Nan')
-            return r
-        r[mask_invalid_values] = np.max(r[np.logical_not(mask_invalid_values)])
+        mask_in = mask
+        mask_out = np.logical_not(mask)
+        r = self._probability(mask_in) - \
+            self._probability(mask_out)
+        r *= -1
         return r
 
 
@@ -106,23 +110,6 @@ class Force3(ImageForce):
                 aux += self.gaussian(np.array([m - i, n - j])) * diff ** 2
         return aux
 
-    def compute_force_2(self, mask):
-        self._mask_in = mask
-        self._mask_out = ~mask
-
-        f_in = self.f_in()
-        f_out = self.f_out()
-        
-        rows = self._image.shape[0]
-        columns = self._image.shape[1]
-        r3 = np.zeros_like(self._image)
-        for i in np.arange(rows):
-            for j in np.arange(columns):
-                sum_in = self.compute_sum(self._mask_in, f_in, i, j)
-                sum_out = self.compute_sum(self._mask_out, f_out, i, j)
-                r3[i, j] = self._k1 * sum_in - self._k0 * sum_out
-        return r3
-
     def compute_force(self, mask):
         self._mask_in = mask
         self._mask_out = ~mask
@@ -160,7 +147,9 @@ class Force3(ImageForce):
             self._kernel_size,
             self._sigma)
         t5[self._mask_in] = 0
-        return t1 + t2 + t3 + t4 + t5
+
+        r3 = t1 + t2 + t3 + t4 + t5
+        return r3 * (-1)
 
 
 if __name__=='__main__':
