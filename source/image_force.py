@@ -19,9 +19,11 @@ class Force1(ImageForce):
     def compute_force(self, mask):
         self._mask_in = mask
         self._mask_out = ~mask
+        if np.all(self._mask_in):
+            self._mean_value_out = 0
+        else:
+            self._mean_value_out = np.mean(self._image[self._mask_out])
         self._mean_value_in = np.mean(self._image[self._mask_in])
-        self._mean_value_out = np.mean(self._image[self._mask_out])
-        print(f'in_{self._mean_value_in} out:{self._mean_value_out}')
         return self._k1 * (self._image - self._mean_value_in) ** 2 - self._k0 * (self._image - self._mean_value_out) ** 2
 
 
@@ -34,12 +36,18 @@ class Force2(ImageForce):
 
     def compute_force(self, mask):
         self._mask_in = mask
-        self._mask_out = ~mask
+        self._mask_out = np.logical_not(mask)
         self._mean_value_in = np.mean(self._image[self._mask_in])
         self._var_value_in = np.std(self._image[self._mask_in])**2
         self._mean_value_out = np.mean(self._image[self._mask_out])
         self._var_value_out = np.std(self._image[self._mask_out])**2
-        return np.log(self.proba_in()) - np.log(self.proba_out()) 
+        r = np.log(self.proba_in()) - np.log(self.proba_out())
+        mask_invalid_values = np.logical_or(np.isnan(r), np.isinf(r))
+        if np.all(mask_invalid_values):
+            print('All values are inf or Nan')
+            return r
+        r[mask_invalid_values] = np.max(r[np.logical_not(mask_invalid_values)])
+        return r
 
 
 class Force3(ImageForce):

@@ -61,7 +61,10 @@ class SplitBregmanGCS():
             print(f'----------------- Iteration error {error[-1]} ------------------------')
             # Calculate force
             r = self._force.get_force(u > 0)
-
+            if np.all(u > 0):
+                print('Level set is all positive')
+                
+            
             # Save prev level set
             u_prev = u.copy()
 

@@ -82,6 +82,10 @@ class GaussSeidel:
         nx = p.shape[0]
         ny = p.shape[1]
         self.p_evolution = [p]
+        if np.any(np.isnan(b)):
+            raise ValueError("Gauss Seidel receive a b parameter with NaN value")
+        if np.any(np.isnan(p)):
+            raise ValueError("Gauss Seidel receive a p parameter with NaN value")
         with tqdm(total=self.max_iter, desc='Gauss Seidel Iteration') as pbar:
             while (diff > self.tolerance):
                 if it > self.max_iter:
@@ -96,7 +100,6 @@ class GaussSeidel:
                         pnew[i, j] = (0.25 * (pnew[i - 1, j] + p[i + 1, j]
                                               + pnew[i, j - 1]
                                               + p[i, j+1]-b[i, j]*dx**2))
-
                 diff = l2_diff(pnew, p)
                 tol_hist_gs.append(diff)
                 self.p_evolution.append(pnew)
@@ -107,8 +110,7 @@ class GaussSeidel:
                   f' number of iterations. Last l2_diff was: {diff:.5e}')
         else:
             print(f'The solution converged after {it} iterations')
-        if np.any(np.isnan(pnew)):
-            raise ValueError("Gauss Seidel returning NaN value")
+        
         return pnew, tol_hist_gs
 
     def plot_per_iteration(self, iterations_list=None):
